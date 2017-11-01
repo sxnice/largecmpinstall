@@ -49,6 +49,8 @@ innodb_log_files_in_group = 3
 innodb_max_dirty_pages_pct = 90
 innodb_lock_wait_timeout = 120
 innodb_file_per_table = on
+innodb_print_all_deadlocks = 1
+innodb_flush_method = O_DIRECT
 concurrent_insert = 2
 
 ssl-ca=/usr/local/mysql/data/ca.pem
@@ -59,7 +61,7 @@ default_authentication_plugin=sha256_password
 # replication-------------------------------20170808
 symbolic-links=0
 sync_binlog = 1
-innodb_flush_log_at_trx_commit = 2
+innodb_flush_log_at_trx_commit = 1
 log_bin = mysql-bin  
 log_bin_index = mysql-bin.index
 server_id=1
