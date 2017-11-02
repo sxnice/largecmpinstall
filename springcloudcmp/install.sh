@@ -226,8 +226,10 @@ EOF
 	do
 		scp .hosts $i:/root
 		ssh $i <<EOF
+	#	cat ~/.hosts >>/etc/hosts
+	#	rm -rf ~/.hosts
+		awk '{print \$0}' /etc/hosts ~/.hosts |sort|uniq -u >/etc/hosts
 		cat ~/.hosts >>/etc/hosts
-		rm -rf ~/.hosts
 		exit
 EOF
 	done
