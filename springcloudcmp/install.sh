@@ -183,7 +183,6 @@ EOF
 	do
                 echo "安装jdk1.8到节点"$i
                 ssh -n "$i" mkdir -p "$JDK_DIR"
-
                 scp -r ../packages/jdk/* "$i":"$JDK_DIR"
                 scp ../packages/jce/* "$i":"$JDK_DIR"/jre/lib/security/
                 ssh "$i"  <<EOF
@@ -269,6 +268,7 @@ install_redis(){
                 do
                 echo "安装节点..."$i
 		ssh -n "$i" mkdir -p "$REDIS_DIR"
+		chmod -R 744 ../packages/redis/*
                 scp -r ../packages/redis/* "$i":"$REDIS_DIR"
                 #编译安装
 		ssh $i <<EOF
