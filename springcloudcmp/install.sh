@@ -156,7 +156,7 @@ EOF
                                          ssh -n $i rpm -Uvh --replacepkgs ~/ntpdate-4.2.6p5-10.el6.centos.2.x86_64.rpm ~/ntp-4.2.6p5-10.el6.centos.2.x86_64.rpm
                                  elif [ "${ostype}" == "centos_7" ]; then
                                          scp ../packages/centos7_ntp/* "$i":/root/
-                                         ssh -n $i rpm -Uvh --replacepkgs  ~/ntp-4.2.6p5-25.el7.centos.2.x86_64.rpm
+                                         rpm -Uvh --replacepkgs ~/centos7_ntp/*
                                  fi
                          fi
 		elif [ "$os" == "ubuntu" ]; then
