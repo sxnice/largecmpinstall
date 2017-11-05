@@ -813,12 +813,12 @@ do
 		ssh-interconnect
 		user-internode
 		install-interpackage
+		iptable_redisnode
 		install_redis
 	#	mongo_install
 		copy-internode
 		env_internode
 		iptable_imnode
-		iptable_redisnode
 		start_internode
 		keeplived_settings
         break
@@ -828,13 +828,13 @@ do
 		ssh-interconnect
 		user-internode
 		install-interpackage
+		iptable_redisnode
 		install_redis
+		iptable_mongonode
 		mongo_install
 		copy-internode
 		env_internode
 		iptable_imnode
-                iptable_redisnode
-		iptable_mongonode
 		start_internode
 		keeplived_settings
         break
