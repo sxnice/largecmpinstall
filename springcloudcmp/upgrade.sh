@@ -326,24 +326,16 @@ iptable_imnode(){
 start_internode(){
 	echo_green "启动IM开始..."
 	#启动主控节点1或集中式启动串行启动！
-	local k=0
 	#从文件里读取ip节点组，一行为一个组
 	cat haiplist | while read line
         do
+		local k=0
                 SSH_HOST=($line)
                 echo "启动节点组"
 		for i in "${SSH_HOST[@]}"
 		do
 			echo "启动节点"$i
 			ssh -n $i 'su - '$cmpuser' -c '$CURRENT_DIR'/startIM.sh'
-		#	ssh $i <<EOF
-		#	su - $cmpuser
-		#	source /etc/environment
-		#	umask 077
-		#	cd "$CURRENT_DIR"
-		#	./startIM.sh
-		#	exit
-#EOF
 			echo "节点"$i"启动完成"
 			break
 		done
@@ -362,7 +354,6 @@ start_internode(){
 		done
 		
 		#检测其他节点服务是否成功!
-		k=0
 		for i in "${SSH_HOST[@]}"
 		do
 		if [ "$k" -eq 0 ];then
@@ -419,13 +410,13 @@ echo_yellow "-------------------------------------------"
 echo_green "HA方案，请输入编号：" 
 sleep 3
 clear
-echo "1-----3台服务器,每台16G内存.2台控制节点，1台采集节点"  
+echo "1-----4台服务器,每台16G内存.3台控制节点，1台采集节点"  
 
 while read item
 do
   case $item in
     [1])
-        nodeplanr=2
+        nodeplanr=3
 		ssh-interconnect
 		user-internode
 		install-interpackage

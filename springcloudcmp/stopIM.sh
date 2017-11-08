@@ -27,6 +27,7 @@ CURRENT_DIR=`cd "$PRGDIR" >/dev/null; pwd`
 "$CURRENT_DIR"/background/springbootstopgatherframe.sh
 "$CURRENT_DIR"/background/springbootstopeseemanager.sh
 "$CURRENT_DIR"/background/springbootstopgmccmanager.sh
+"$CURRENT_DIR"/background/springbootstopuniviewmanager.sh
 
 CURRENT_DIR=`cd "$PRGDIR" >/dev/null; pwd`
 "$CURRENT_DIR"/im/im-task-stop.sh

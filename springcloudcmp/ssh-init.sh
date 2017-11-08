@@ -1,5 +1,6 @@
 #!/bin/bash
 source ./colorecho
+pass="Pbu4@123"
 wd=.__tmp__sfsfas
 mkdir -p $wd
 
@@ -9,22 +10,25 @@ generate_key(){
     fi
 }
 
-#ssh-keygen -t rsa <<eof
-#
-#
-#
-#
-#eof
-
 generate_key
 
 for i in "$@"
 do
- echo =======$i=======
-# ssh -o StrictHostKeyChecking=no $i 
- ssh-copy-id -i ~/.ssh/id_rsa.pub $i
-
+echo =======$i=======
+#ssh-copy-id -i ~/.ssh/id_rsa.pub $i
+expect <<-EOF
+set timeout -1
+spawn  ssh-copy-id -i /root/.ssh/id_rsa.pub $i
+expect {
+"*yes/no" { send "yes\n"; exp_continue }
+"*exist" { send "login ok\n" }
+"*password" { send "${passwd}\n" }
+}
+expect eof
+EOF
 done
+
+
 
 rm -rf $wd
 exit 0

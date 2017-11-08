@@ -191,7 +191,7 @@ EOF
 			./mysql_ssl_rsa_setup --user=mysql --datadir=/usr/local/mysql/data
 			chmod 644 /usr/local/mysql/data/server-key.pem
 			echo "第一次启动MYSQL"
-			/etc/init.d/mysql restart
+			/etc/init.d/mysql start
 			echo "配置开机启动"
 			chkconfig --add mysqld
 			chkconfig --level 2345 mysqld on

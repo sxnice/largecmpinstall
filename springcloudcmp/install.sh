@@ -229,10 +229,10 @@ EOF
 	do
 		scp .hosts $i:/root
 		ssh $i <<EOF
-	#	cat ~/.hosts >>/etc/hosts
-	#	rm -rf ~/.hosts
-		awk '{print \$0}' /etc/hosts ~/.hosts |sort|uniq -u >/etc/hosts
-		cat ~/.hosts >>/etc/hosts
+		cat ~/.hosts >>~/.tmp_hosts
+		cat /etc/hosts >> ~/.tmp_hosts
+		cat ~/.tmp_hosts  | sort | uniq > /etc/hosts
+		rm -rf ~/.tmp_hosts
 		exit
 EOF
 	done
@@ -612,14 +612,6 @@ start_internode(){
 		do
 			echo "启动节点"$i
 			ssh -n $i 'su - '$cmpuser' -c '$CURRENT_DIR'/startIM.sh'
-	#		ssh $i <<EOF
-	#		su - $cmpuser
-	#		source /etc/environment
-	#		umask 077
-	#		cd "$CURRENT_DIR"
-	#		./startIM.sh
-	#		exit
-#EOF
 			echo "节点"$i"启动完成"
 			break
 		done
@@ -632,21 +624,13 @@ start_internode(){
 			continue
 		fi
 		echo "启动节点"$i
-	#	 ssh $i <<EOF
-	#	 su - $cmpuser
-	#	 source /etc/environment
-	#	 umask 077
-	#	 cd "$CURRENT_DIR"
-	#	 ./startIM_BX.sh
-	#	 exit
-#EOF
 		ssh -nf $i 'su - '$cmpuser' -c '$CURRENT_DIR'/startIM_BX.sh > /dev/null'
 		let k=k+1
 		echo "发启启动指令成功"
 		done
 		
 		#检测其他节点服务是否成功!
-		k=0
+		
 		for i in "${SSH_HOST[@]}"
 		do
 		if [ "$k" -eq 0 ];then
@@ -665,7 +649,6 @@ EOF
 		let k=k+1
 		echo "节点检测成功"
 		done
-		k = 0
 	done
 	echo_green "启动IM完成..."
 }
@@ -801,15 +784,15 @@ echo_yellow "-------------------------------------------"
 echo_green "HA版方案，请输入编号："
 sleep 3
 clear
-echo "1-----3台服务器,每台16G内存.2台控制节点，1台采集节点(无mongodb安装)"
-echo "2-----3台服务器,每台16G内存.2台控制节点，1台采集节点(有mongodb安装)" 
+echo "1-----4台服务器,每台16G内存.3台控制节点，1台采集节点(无mongodb安装)"
+echo "2-----4台服务器,每台16G内存.3台控制节点，1台采集节点(有mongodb安装)" 
 echo "3-----清空部署(mysql,redis,mongo不受影响，但升级环境禁止使用)"
 
 while read item
 do
   case $item in
     [1])
-        nodeplanr=2
+        nodeplanr=3
 		ssh-interconnect
 		user-internode
 		install-interpackage
@@ -824,7 +807,7 @@ do
         break
         ;;
     [2])
-        nodeplanr=2
+        nodeplanr=3
 		ssh-interconnect
 		user-internode
 		install-interpackage

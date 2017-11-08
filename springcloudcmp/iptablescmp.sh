@@ -20,12 +20,6 @@ ssh  $i <<EOF
 		iptables -A cmp -p tcp --dport 20892 -j ACCEPT
 		iptables -A cmp -p tcp --dport 8443 -j ACCEPT
 		iptables -A cmp -p tcp --dport 3306 -j ACCEPT
-		iptables -A cmp -p udp --dport 123 -j ACCEPT
-		iptables -A cmp -p 112 -j ACCEPT
-		iptables -A cmp -d 224.0.0.0/8 -j ACCEPT
-		iptables -A cmp -s 127.0.0.1 -p tcp --dport 8761 -j ACCEPT
-		iptables -A cmp -s 127.0.0.1 -p tcp --dport 8888 -j ACCEPT
-		iptables -A cmp -s 127.0.0.1 -p tcp --dport 61626 -j ACCEPT
 		iptables -A INPUT -j cmp
 		iptables -P INPUT DROP
 		exit
@@ -34,7 +28,9 @@ EOF
 for k in $hosts
 do
 ssh $i <<EOF
-		
+		iptables -A cmp -s 127.0.0.1 -p tcp --dport 8761 -j ACCEPT
+		iptables -A cmp -s 127.0.0.1 -p tcp --dport 8888 -j ACCEPT
+		iptables -A cmp -s 127.0.0.1 -p tcp --dport 61626 -j ACCEPT
 		iptables -A cmp -s $k -p tcp --dport 8761 -j ACCEPT
 		iptables -A cmp -s $k -p tcp --dport 8888 -j ACCEPT
 		iptables -A cmp -s $k -p tcp --dport 20881 -j ACCEPT
@@ -50,6 +46,7 @@ ssh $i <<EOF
 		iptables -A cmp -s $k -p tcp --dport 20891 -j ACCEPT
 		iptables -A cmp -s $k -p tcp --dport 20893 -j ACCEPT
 		iptables -A cmp -s $k -p tcp --dport 20894 -j ACCEPT
+		iptables -A cmp -s $k -p tcp --dport 20895 -j ACCEPT
 		iptables -A cmp -s $k -p tcp --dport 28084 -j ACCEPT
 		iptables -A cmp -s $k -p tcp --dport 28085 -j ACCEPT
 		iptables -A cmp -s $k -p tcp --dport 28086 -j ACCEPT

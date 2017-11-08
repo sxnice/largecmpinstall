@@ -37,7 +37,11 @@ ft_min_word_len = 8
 thread_stack = 512K
 transaction_isolation = REPEATABLE-READ
 tmp_table_size = 128M
-long_query_time = 6
+slow_query_log = 1
+long_query_time=0.5
+innodb_read_io_threads = 32
+innodb_write_io_threads = 32
+innodb_buffer_pool_instances= 8
 
 innodb_buffer_pool_size = 1G
 innodb_thread_concurrency = 16
@@ -68,11 +72,12 @@ server_id=1
 enforce_gtid_consistency = ON
 gtid_mode = ON
 binlog_format = ROW
+log_slave_updates = ON
 relay_log               = relay-bin
 relay_log_index = relay-bin.index
 relay_log_info_file     = relay-bin.info
 expire-logs-days         = 10
-auto_increment_increment = 10 
+auto_increment_increment = 1
 auto_increment_offset = 1
 # semi_replication
 plugin-load = "rpl_semi_sync_master=semisync_master.so;rpl_semi_sync_slave=semisync_slave.so"
