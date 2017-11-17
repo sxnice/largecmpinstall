@@ -39,6 +39,9 @@ ssh-mysqlconnect(){
     echo_green "建立对等互信开始..."
         local ssh_init_path=./ssh-init.sh
         $ssh_init_path $MYSQL_HA
+	if [ $? -eq 1 ]; then
+		exit 1
+	fi
         echo_green "建立对等互信完成..."
         sleep 1
 }
@@ -101,16 +104,19 @@ mysql_install(){
 				fi
 			fi
 			local iptables=`ssh -n "$i" rpm -qa |grep iptables |wc -l`
-			if [ "$iptables" -gt 0 ]; then
+			if [ "$iptables" -gt 1 ]; then
 				echo "iptables 已安装"
 			else
 				if [ "$ostype" == "centos_6" ]; then
 					scp  ../packages/centos6_iptables/* "$i":/root/
 					ssh -n $i rpm -Uvh ~/iptables-1.4.7-16.el6.x86_64.rpm
 				elif [ "$ostype" == "centos_7" ]; then
-					scp ../packages/centos7_iptables/* "$i":/root/
-					ssh -n $i rpm -Uvh ~/iptables-1.4.21-17.el7.x86_64.rpm ~/libnetfilter_conntrack-1.0.6-1.el7_3.x86_64.rpm ~/libmnl-1.0.3-7.el7.x86_64.rpm ~/libnfnetlink-1.0.1-4.el7.x86_64.rpm
-				fi
+                                        scp -r ../packages/centos7_iptables "$i":/root/
+                                        ssh -Tq $i <<EOF
+                                        rpm -Uvh --replacepkgs ~/centos7_iptables/*
+                                        exit
+EOF
+                                fi
 			fi
 			local keepalived=`ssh -n "$i" rpm -qa |grep keepalived |wc -l`
 			if [ "$keepalived" -gt 0 ]; then
@@ -118,13 +124,13 @@ mysql_install(){
 			else
 				if [ "$ostype" == "centos_6" ]; then
 					scp -r ../packages/centos6_keepalived "$i":/root/
-					ssh $i <<EOF
+					ssh -Tq $i <<EOF
                                         rpm -Uvh --replacepkgs ~/centos6_keepalived/*
                                         exit
 EOF
 				elif [ "$ostype" == "centos_7" ]; then
 					scp -r ../packages/centos7_keepalived "$i":/root/
-					ssh $i <<EOF
+					ssh -Tq $i <<EOF
 					rpm -Uvh --replacepkgs ~/centos7_keepalived/*
 					exit
 EOF
@@ -170,7 +176,7 @@ EOF
 		local MEMTOTAL=$(ssh $i free -b | sed -n '2p' | awk '{print $2}')
 		#配置70%
 		local memgbyte=`expr $MEMTOTAL \* 70 / 100 / 1024 / 1024 / 1024`
-		ssh $i <<EOF
+		ssh -Tq $i <<EOF
 			echo "关闭selinux防火墙"
 			setenforce 0
                 	sed -i '/enforcing/{s/enforcing/disabled/}' /etc/selinux/config
@@ -193,8 +199,8 @@ EOF
 			echo "第一次启动MYSQL"
 			/etc/init.d/mysql start
 			echo "配置开机启动"
-			chkconfig --add mysqld
-			chkconfig --level 2345 mysqld on
+			chkconfig --add mysql
+			chkconfig --level 2345 mysql on
 			echo "配置环境变量"
 			sed -i /mysql/d ~/.bashrc
 			echo export PATH=/usr/local/mysql/bin:'\$PATH' >> ~/.bashrc
@@ -275,7 +281,7 @@ keeplived_settings(){
 	scp ./keepalived.conf "$i":/etc/keepalived/
 	scp ./checkmysql.sh "$i":/usr/local/mysql/bin
 
-	ssh $i <<EOF
+	ssh -Tq $i <<EOF
 		setenforce 0
                 sed -i '/enforcing/{s/enforcing/disabled/}' /etc/selinux/config
 		chmod 740 /usr/local/mysql/bin/checkmysql.sh
@@ -292,7 +298,65 @@ EOF
 	echo_green "配置keeplived配置完成..."
 }
 
+#清空mysql安装
+uninstall_mysql(){
+echo_green "关闭mysql开始..."
+        for i in "${MSYQLHA_HOST[@]}"
+        do
+                echo "关闭节点mysql服务"$i
+                local user=`ssh -n $i cat /etc/passwd | awk -F : '{print \$1}' | grep -w mysql |wc -l`
+                if [ "$user" -eq 1 ]; then
+                        local mysqls=`ssh -n $i ps -u mysql | grep -v PID | wc -l`
+                        if [ "$mysqls" -gt 0 ]; then
+                                ssh -Tq $i <<EOF
+                                pkill  mysql
+                                exit
+EOF
+                                echo "complete"
+                        else
+                                echo "MYSQL已关闭"
+                        fi
+		sleep 2
+		ssh -n $i userdel -f mysql
+                else
+                        echo_yellow "尚未创建mysql用户,请手动关闭服务!"
+                fi
+		
+		echo "关闭节点keepalived"$i
+		local keepaliveds=`ssh -n $i rpm -qa | grep keepalived`
+		if [ "$keepaliveds" != "" ]; then
+                                ssh -Tq $i <<EOF
+                                rpm -e $keepaliveds
+                                exit
+EOF
+		fi
+
+		ssh -Tq $i <<EOF
+		rm -rf "$MYSQL_DIR"
+                rm -rf "$KEEPALIVED_DIR"
+                rm -rf /etc/keepalived/
+		exit
+EOF
+		echo "删除mysql节点iptables"$i
+                local iptables=`ssh -n $i iptables -L INPUT | sed -n /mysqldb/p |wc -l`
+                if [ "$iptables" -gt 0 ]; then
+                ssh -Tq $i <<EOF
+                iptables -P INPUT ACCEPT
+                iptables -D INPUT -j mysqldb
+                iptables -F mysqldb
+                iptables -X mysqldb
+                iptables-save > /etc/iptables
+                iptables-save > /etc/sysconfig/iptables
+                exit
+EOF
+                fi
+		echo "complete..."
+        done
+	echo_green "清空安装完成..."
+}
+
 echo "1-----安装数据库主备mysql5.7"
+echo "100-----清空mysql安装"
 while read item
 do
   case $item in
@@ -305,6 +369,10 @@ do
 		iptables-mysql
         break
         ;;
+    100)	ssh-mysqlconnect
+		uninstall_mysql
+	break
+	;;
      0)
         echo "退出"
         exit 0

@@ -38,7 +38,7 @@ start_internode(){
 		for i in "${SSH_HOST[@]}"
 		do
 			echo "启动节点"$i
-			ssh $i <<EOF
+			ssh -Tq $i <<EOF
 			su - $cmpuser
 			source /etc/environment
 			umask 077
@@ -80,7 +80,7 @@ EOF
 			continue
 		fi
 		echo "检测节点"$i
-		 ssh $i <<EOF
+		 ssh -Tq $i <<EOF
 		 su - $cmpuser
 		 source /etc/environment
 		 umask 077
@@ -105,7 +105,7 @@ stop_internode(){
 		if [ "$user" -eq 1 ]; then
 			local jars=`ssh -n $i ps -u $cmpuser | grep -v PID | wc -l`
 			if [ "$jars" -gt 0 ]; then
-				ssh $i <<EOF
+				ssh -Tq $i <<EOF
 				killall -9 -u $cmpuser
 				exit
 EOF

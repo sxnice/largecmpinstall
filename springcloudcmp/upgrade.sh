@@ -50,16 +50,19 @@ install-interpackage(){
 		local os=`echo $ostype | awk -F _ '{print $1}'`
 		if [ "$os" == "centos" ]; then
         		local iptables=`ssh -n "$i" rpm -qa |grep iptables |wc -l`
-       			 if [ "$iptables" -gt 0 ]; then
+       			 if [ "$iptables" -gt 1 ]; then
                 		echo "iptables 已安装"
         		else
                 		if [ "${ostype}" == "centos_6" ]; then
                         		 scp  ../packages/centos6_iptables/* "$i":/root/
                          		 ssh -n $i rpm -Uvh ~/iptables-1.4.7-16.el6.x86_64.rpm
-               			 elif [ "${ostype}" == "centos_7" ]; then
-                        		 scp ../packages/centos7_iptables/* "$i":/root/
-                        		 ssh -n $i rpm -Uvh ~/iptables-1.4.21-17.el7.x86_64.rpm ~/libnetfilter_conntrack-1.0.6-1.el7_3.x86_64.rpm ~/libmnl-1.0.3-7.el7.x86_64.rpm ~/libnfnetlink-1.0.1-4.el7.x86_64.rpm ~/iptables-services-1.4.21-17.el7.x86_64.rpm
-               			 fi
+				elif [ "$ostype" == "centos_7" ]; then
+                                        scp -r ../packages/centos7_iptables "$i":/root/
+                                        ssh -Tq $i <<EOF
+                                        rpm -Uvh --replacepkgs ~/centos7_iptables/*
+                                        exit
+EOF
+                                fi
         		fi
 	        	local lsof=`ssh -n "$i" rpm -qa |grep lsof |wc -l`
                 	 if [ "$lsof" -gt 0 ]; then
@@ -91,14 +94,14 @@ install-interpackage(){
                          else
                                 if [ "${ostype}" == "centos_6" ]; then
                                          scp -r  ../packages/centos6_gcc "$i":/root/
-					 ssh $i <<EOF
+					 ssh -Tq $i <<EOF
                                              rpm -Uvh --replacepkgs ~/centos6_gcc/*
 					     rm -rf ~/centos6_gcc
                                              exit
 EOF
                                  elif [ "${ostype}" == "centos_7" ]; then
                                          scp -r ../packages/centos7_gcc "$i":/root/
-					 ssh $i <<EOF
+					 ssh -Tq $i <<EOF
                                              rpm -Uvh --replacepkgs ~/centos7_gcc/*
 					     rm -rf ~/centos7_gcc
                                              exit
@@ -138,7 +141,7 @@ EOF
 
                 scp -r ../packages/jdk/* "$i":"$JDK_DIR"
                 scp ../packages/jce/* "$i":"$JDK_DIR"/jre/lib/security/
-                ssh "$i"  <<EOF
+                ssh -Tq "$i"  <<EOF
                     chmod 755 "$JDK_DIR"/bin/*
                     sed -i /JAVA_HOME/d /etc/profile
                     echo JAVA_HOME="$JDK_DIR" >> /etc/profile
@@ -156,7 +159,7 @@ EOF
                 
 EOF
                 echo "系统配置节点"$i
-                ssh "$i" <<EOF
+                ssh -Tq "$i" <<EOF
                     sed -i /$cmpuser/d /etc/security/limits.conf
                     echo $cmpuser soft nproc unlimited >>/etc/security/limits.conf
                     echo $cmpuser hard nproc unlimited >>/etc/security/limits.conf
@@ -177,6 +180,9 @@ ssh-interconnect(){
         for line in $(cat haiplist)
         do
 		$ssh_init_path $line
+		if [ $? -eq 1 ]; then
+			exit 1
+		fi
 	done
 	echo_green "建立对等互信完成..."
 }
@@ -192,7 +198,7 @@ user-internode(){
 		for i in "${SSH_HOST[@]}"
 		do
 			echo =======$i=======
-			ssh $i <<EOF
+			ssh -Tq $i <<EOF
 			groupadd $cmpuser
  			useradd -m -s  /bin/bash -g $cmpuser $cmpuser
  			usermod -G $cmpuser $cmpuser
@@ -221,7 +227,7 @@ copy-internode(){
 			ssh -n $i mkdir -p $CURRENT_DIR
 			scp -r ./background ./im ./config startIM.sh startIM_BX.sh stopIM.sh im.config imstart_chk.sh "$i":$CURRENT_DIR
 			#赋权
-			ssh $i <<EOF
+			ssh -Tq $i <<EOF
 			rm -rf /tmp/spring.log
 			rm -rf /tmp/modelTypeName.data
 			chown -R $cmpuser.$cmpuser $CURRENT_DIR
@@ -267,7 +273,7 @@ env_internode(){
 		for j in "${SSH_HOST[@]}"
 			do
 			echo "配置节点"$j
-			ssh $j <<EOF			
+			ssh -Tq $j <<EOF			
 			source /etc/environment
 			su - $cmpuser
 			
@@ -361,7 +367,7 @@ start_internode(){
 			continue
 		fi
 		echo "检测节点"$i
-		 ssh $i <<EOF
+		 ssh -Tq $i <<EOF
 		 su - $cmpuser
 		 source /etc/environment
 		 umask 077
@@ -389,7 +395,7 @@ for i in $(cat haiplist)
 	local keepalived=`ssh -n "$i" rpm -qa |grep keepalived |wc -l`
 	if [ "$keepalived" -gt 0 ]; then
 		scp ./checkZuul.sh "$i":"$KEEPALIVED_DIR"
-		ssh $i <<EOF
+		ssh -Tq $i <<EOF
                 setenforce 0
                 sed -i '/enforcing/{s/enforcing/disabled/}' /etc/selinux/config
 		chmod 740 /usr/local/keepalived/checkZuul.sh
@@ -410,13 +416,13 @@ echo_yellow "-------------------------------------------"
 echo_green "HA方案，请输入编号：" 
 sleep 3
 clear
-echo "1-----4台服务器,每台16G内存.3台控制节点，1台采集节点"  
+echo "1-----3台服务器,每台16G内存.2台控制节点，1台采集节点"  
 
 while read item
 do
   case $item in
     [1])
-        nodeplanr=3
+        nodeplanr=2
 		ssh-interconnect
 		user-internode
 		install-interpackage

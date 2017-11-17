@@ -6,11 +6,12 @@ do
 echo "配置控制节点"$i 
 ostype=`ssh $i head -n 1 /etc/issue | awk '{print $1}'`
 #开放端口外部访问
-ssh  $i <<EOF
+ssh -Tq $i <<EOF
 		iptables -P INPUT ACCEPT
 		iptables-save >/etc/iptables
 		sed -i /cmp/d /etc/iptables
 		sed -i /'--dport 22 -j ACCEPT'/d /etc/iptables
+		sed -i /"-A INPUT -m state --state RELATED,ESTABLISHED -j ACCEPT"/d /etc/iptables
 		iptables-restore </etc/iptables
 		iptables -A INPUT -p tcp --dport 22 -j ACCEPT
 		iptables --new cmp
@@ -20,17 +21,20 @@ ssh  $i <<EOF
 		iptables -A cmp -p tcp --dport 20892 -j ACCEPT
 		iptables -A cmp -p tcp --dport 8443 -j ACCEPT
 		iptables -A cmp -p tcp --dport 3306 -j ACCEPT
+		iptables -A cmp -p udp --dport 123 -j ACCEPT
+		iptables -A cmp -p 112 -j ACCEPT
+		iptables -A cmp -d 224.0.0.0/8 -j ACCEPT
+		iptables -A cmp -s 127.0.0.1 -p tcp --dport 8761 -j ACCEPT
+		iptables -A cmp -s 127.0.0.1 -p tcp --dport 8888 -j ACCEPT
+		iptables -A cmp -s 127.0.0.1 -p tcp --dport 61626 -j ACCEPT
 		iptables -A INPUT -j cmp
-		iptables -P INPUT DROP
 		exit
 EOF
 #内部通讯端口矩阵
 for k in $hosts
 do
-ssh $i <<EOF
-		iptables -A cmp -s 127.0.0.1 -p tcp --dport 8761 -j ACCEPT
-		iptables -A cmp -s 127.0.0.1 -p tcp --dport 8888 -j ACCEPT
-		iptables -A cmp -s 127.0.0.1 -p tcp --dport 61626 -j ACCEPT
+ssh -Tq $i <<EOF
+		
 		iptables -A cmp -s $k -p tcp --dport 8761 -j ACCEPT
 		iptables -A cmp -s $k -p tcp --dport 8888 -j ACCEPT
 		iptables -A cmp -s $k -p tcp --dport 20881 -j ACCEPT
@@ -46,17 +50,19 @@ ssh $i <<EOF
 		iptables -A cmp -s $k -p tcp --dport 20891 -j ACCEPT
 		iptables -A cmp -s $k -p tcp --dport 20893 -j ACCEPT
 		iptables -A cmp -s $k -p tcp --dport 20894 -j ACCEPT
-		iptables -A cmp -s $k -p tcp --dport 20895 -j ACCEPT
 		iptables -A cmp -s $k -p tcp --dport 28084 -j ACCEPT
 		iptables -A cmp -s $k -p tcp --dport 28085 -j ACCEPT
 		iptables -A cmp -s $k -p tcp --dport 28086 -j ACCEPT
 		iptables -A cmp -s $k -p tcp --dport 61626 -j ACCEPT
+		iptables -A cmp -s $k -p tcp --dport 20895 -j ACCEPT
 		exit
 
 EOF
 done
 if [ "$ostype" == "Ubuntu" ]; then
-        ssh  $i <<EOF
+        ssh -Tq $i <<EOF
+		iptables -A INPUT -m state --state ESTABLISHED,RELATED -j ACCEPT
+		iptables -P INPUT DROP
                 iptables-save > /etc/iptables
                 sed -i /iptables/d /etc/rc.local
                 sed -i /exit/d /etc/rc.local
@@ -65,7 +71,9 @@ if [ "$ostype" == "Ubuntu" ]; then
 		exit
 EOF
 else
-        ssh  $i <<EOF
+        ssh -Tq  $i <<EOF
+		iptables -A INPUT -m state --state ESTABLISHED,RELATED -j ACCEPT
+		iptables -P INPUT DROP
                 iptables-save > /etc/sysconfig/iptables
                 sed -i /iptables/d /etc/rc.d/rc.local
                 echo "iptables-restore < /etc/sysconfig/iptables" >>/etc/rc.d/rc.local

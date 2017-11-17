@@ -7,7 +7,7 @@ echo "配置节点"$i
 ostype=`ssh $i head -n 1 /etc/issue | awk '{print $1}'`
 
 #开放端口外部访问
-ssh  $i <<EOF
+ssh -Tq $i <<EOF
 
 		iptables -P INPUT ACCEPT
 		iptables -D INPUT -p tcp --dport 3306 -j ACCEPT
@@ -19,7 +19,7 @@ ssh  $i <<EOF
 EOF
 
 if [ "$ostype" == "Ubuntu" ]; then
-	ssh  $i <<EOF
+	ssh -Tq $i <<EOF
 		iptables-save > /etc/iptables
 		sed -i /iptables/d /etc/rc.local
 		sed -i /exit/d /etc/rc.local
@@ -28,7 +28,7 @@ if [ "$ostype" == "Ubuntu" ]; then
 		exit
 EOF
 else
-	ssh  $i <<EOF
+	ssh -Tq $i <<EOF
                 iptables-save > /etc/sysconfig/iptables
                 sed -i /iptables/d /etc/rc.d/rc.local
                 echo "iptables-restore < /etc/sysconfig/iptables" >>/etc/rc.d/rc.local

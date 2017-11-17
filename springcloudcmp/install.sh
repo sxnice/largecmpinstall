@@ -80,16 +80,19 @@ install-interpackage(){
 		local os=`echo $ostype | awk -F _ '{print $1}'`
 		if [ "$os" == "centos" ]; then
         		local iptables=`ssh -n "$i" rpm -qa |grep iptables |wc -l`
-       			 if [ "$iptables" -gt 0 ]; then
+       			 if [ "$iptables" -gt 1 ]; then
                 		echo "iptables 已安装"
         		else
                 		if [ "${ostype}" == "centos_6" ]; then
                         		 scp  ../packages/centos6_iptables/* "$i":/root/
                          		 ssh -n $i rpm -Uvh ~/iptables-1.4.7-16.el6.x86_64.rpm
-               			 elif [ "${ostype}" == "centos_7" ]; then
-                        		 scp ../packages/centos7_iptables/* "$i":/root/
-                        		 ssh -n $i rpm -Uvh ~/iptables-1.4.21-17.el7.x86_64.rpm ~/libnetfilter_conntrack-1.0.6-1.el7_3.x86_64.rpm ~/libmnl-1.0.3-7.el7.x86_64.rpm ~/libnfnetlink-1.0.1-4.el7.x86_64.rpm ~/iptables-services-1.4.21-17.el7.x86_64.rpm
-               			 fi
+				elif [ "$ostype" == "centos_7" ]; then
+                                        scp -r ../packages/centos7_iptables "$i":/root/
+                                        ssh -Tq $i <<EOF
+                                        rpm -Uvh --replacepkgs ~/centos7_iptables/*
+                                        exit
+EOF
+                                fi
         		fi
 	        	local lsof=`ssh -n "$i" rpm -qa |grep lsof |wc -l`
                 	 if [ "$lsof" -gt 0 ]; then
@@ -121,14 +124,14 @@ install-interpackage(){
                          else
                                 if [ "${ostype}" == "centos_6" ]; then
                                          scp -r  ../packages/centos6_gcc "$i":/root/
-					 ssh $i <<EOF
+					 ssh -Tq $i <<EOF
                                              rpm -Uvh --replacepkgs ~/centos6_gcc/*
 					     rm -rf ~/centos6_gcc
                                              exit
 EOF
                                  elif [ "${ostype}" == "centos_7" ]; then
                                          scp -r ../packages/centos7_gcc "$i":/root/
-					 ssh $i <<EOF
+					 ssh -Tq $i <<EOF
                                              rpm -Uvh --replacepkgs ~/centos7_gcc/*
 					     rm -rf ~/centos7_gcc
                                              exit
@@ -155,8 +158,8 @@ EOF
                                          scp  ../packages/centos6_ntp/* "$i":/root/
                                          ssh -n $i rpm -Uvh --replacepkgs ~/ntpdate-4.2.6p5-10.el6.centos.2.x86_64.rpm ~/ntp-4.2.6p5-10.el6.centos.2.x86_64.rpm
                                  elif [ "${ostype}" == "centos_7" ]; then
-                                         scp ../packages/centos7_ntp/* "$i":/root/
-                                         ssh $i <<EOF
+                                         scp -r ../packages/centos7_ntp "$i":/root/
+                                         ssh -Tq $i <<EOF
                                              rpm -Uvh --replacepkgs ~/centos7_ntp/*
                                              rm -rf ~/centos7_ntp
                                              exit
@@ -186,10 +189,13 @@ EOF
 	for i in $(cat haiplist)
 	do
                 echo "安装jdk1.8到节点"$i
-                ssh -n "$i" mkdir -p "$JDK_DIR"
+                ssh -Tq "$i" <<EOF
+                rm -rf "$JDK_DIR"
+                mkdir -p "$JDK_DIR"
+EOF
                 scp -r ../packages/jdk/* "$i":"$JDK_DIR"
                 scp ../packages/jce/* "$i":"$JDK_DIR"/jre/lib/security/
-                ssh "$i"  <<EOF
+                ssh -Tq "$i"  <<EOF
                     chmod 755 "$JDK_DIR"/bin/*
                     sed -i /JAVA_HOME/d /etc/profile
                     echo JAVA_HOME="$JDK_DIR" >> /etc/profile
@@ -207,7 +213,7 @@ EOF
                 
 EOF
                 echo "系统配置节点"$i
-                ssh "$i" <<EOF
+                ssh -Tq "$i" <<EOF
                     sed -i /$cmpuser/d /etc/security/limits.conf
                     echo $cmpuser soft nproc unlimited >>/etc/security/limits.conf
                     echo $cmpuser hard nproc unlimited >>/etc/security/limits.conf
@@ -228,7 +234,7 @@ EOF
 	for i in $(cat haiplist)
 	do
 		scp .hosts $i:/root
-		ssh $i <<EOF
+		ssh -Tq $i <<EOF
 		cat ~/.hosts >>~/.tmp_hosts
 		cat /etc/hosts >> ~/.tmp_hosts
 		cat ~/.tmp_hosts  | sort | uniq > /etc/hosts
@@ -246,7 +252,7 @@ EOF
 	if [ "$ostype" == "centos_7" ]; then
 		scp ./ntpd "$i":/etc/init.d/
 	fi
-	ssh $i <<EOF
+	ssh -Tq $i <<EOF
 		sed -i '/ntpip/{s/ntpip/$NTPIP/}' /etc/ntp.conf
 		chmod u+x /etc/init.d/ntpd
 		/etc/init.d/ntpd restart
@@ -275,7 +281,7 @@ install_redis(){
 		chmod -R 744 ../packages/redis/*
                 scp -r ../packages/redis/* "$i":"$REDIS_DIR"
                 #编译安装
-		ssh $i <<EOF
+		ssh -Tq $i <<EOF
 		cd $REDIS_DIR
 		make 
 		make install
@@ -283,7 +289,7 @@ EOF
 		#1主1哨，2从2哨
 		if [ "$k" -eq 1 ]; then
                         scp ./redismaster.conf "$i":"$REDIS_DIR"/redismaster.conf
-			ssh $i <<EOF
+			ssh -Tq $i <<EOF
 			sed -i 's/redismport/$mport/g' "$REDIS_DIR"/redismaster.conf
 			sed -i 's/redismip/$i/g' "$REDIS_DIR"/redismaster.conf
 			redis-server "$REDIS_DIR"/redismaster.conf
@@ -293,7 +299,7 @@ EOF
 EOF
                 elif [ "$k" -gt 1 ]; then
 			scp ./redisslave.conf "$i":"$REDIS_DIR"/redisslave.conf
-			ssh $i <<EOF
+			ssh -Tq $i <<EOF
                         sed -i 's/redisrport/$rport/g' "$REDIS_DIR"/redisslave.conf
 			sed -i 's/redismport/$mport/g' "$REDIS_DIR"/redisslave.conf
                         sed -i 's/redisrip/$i/g' "$REDIS_DIR"/redisslave.conf
@@ -305,7 +311,7 @@ EOF
 EOF
                 fi
 			scp ./redissentinel.conf "$i":"$REDIS_DIR"/redissentinel.conf
-                        ssh $i <<EOF
+                        ssh -Tq $i <<EOF
                         sed -i 's/redismport/$mport/g' "$REDIS_DIR"/redissentinel.conf
 			sed -i 's/redissport/$sport/g' "$REDIS_DIR"/redissentinel.conf
                         sed -i 's/redissip/$i/g' "$REDIS_DIR"/redissentinel.conf
@@ -330,6 +336,9 @@ ssh-interconnect(){
         for line in $(cat allnodes)
         do
 		$ssh_init_path $line
+		if [ $? -eq 1 ]; then
+			exit 1
+		fi
 	done
 	rm -rf allnodes
 	echo_green "建立对等互信完成..."
@@ -346,7 +355,7 @@ user-internode(){
 		for i in "${SSH_HOST[@]}"
 		do
 			echo =======$i=======
-			ssh $i <<EOF
+			ssh -Tq $i <<EOF
 			groupadd $cmpuser
  			useradd -m -s  /bin/bash -g $cmpuser $cmpuser
  			usermod -G $cmpuser $cmpuser
@@ -375,7 +384,7 @@ copy-internode(){
 			ssh -n $i mkdir -p $CURRENT_DIR
 			scp -r ./background ./im ./config startIM.sh startIM_BX.sh stopIM.sh im.config imstart_chk.sh "$i":$CURRENT_DIR
 			#赋权
-			ssh $i <<EOF
+			ssh -Tq $i <<EOF
 			rm -rf /tmp/spring.log
 			rm -rf /tmp/modelTypeName.data
 			chown -R $cmpuser.$cmpuser $CURRENT_DIR
@@ -455,7 +464,7 @@ env_internode(){
 			echo_yellow "设置hanode="$hanoder
 
 			
-			ssh $j <<EOF
+			ssh -Tq $j <<EOF
             		sed -i /nodeplan/d /etc/environment
 			sed -i /nodetype/d /etc/environment
 			sed -i /nodeno/d /etc/environment
@@ -561,14 +570,14 @@ keeplived_settings(){
 	else
 		if [ "$ostype" == "centos_6" ]; then
 			scp -r ../packages/centos6_keepalived "$i":/root/
-			ssh $i <<EOF
+			ssh -Tq $i <<EOF
                         rpm -Uvh --replacepkgs ~/centos6_keepalived/*
                         exit
 EOF
 		elif [ "$ostype" == "centos_7" ]; then
 			scp -r ../packages/centos7_keepalived "$i":/root/
 			scp ./keepalived "$i":/etc/init.d/
-			ssh $i <<EOF
+			ssh -Tq $i <<EOF
 			rpm -Uvh --replacepkgs ~/centos7_keepalived/*
 			exit
 EOF
@@ -579,7 +588,7 @@ EOF
 	scp ./keepalived.conf "$i":/etc/keepalived/
 	scp ./checkZuul.sh "$i":"$KEEPALIVED_DIR"
 
-	ssh $i <<EOF
+	ssh -Tq $i <<EOF
                 setenforce 0
                 sed -i '/enforcing/{s/enforcing/disabled/}' /etc/selinux/config
 		chmod 740 /usr/local/keepalived/checkZuul.sh
@@ -638,7 +647,7 @@ start_internode(){
 			continue
 		fi
 		echo "检测节点"$i
-		 ssh $i <<EOF
+		 ssh -Tq $i <<EOF
 		 su - $cmpuser
 		 source /etc/environment
 		 umask 077
@@ -658,13 +667,13 @@ stop_internode(){
 	echo_green "关闭IM开始..."
 	for i in $(cat haiplist)
 	do
-		echo "关闭节点"$i
+		echo "关闭节点IM服务"$i
 		#local user=`ssh -n $i cat /etc/passwd | sed -n /$cmpuser/p |wc -l`
 		local user=`ssh -n $i cat /etc/passwd | awk -F : '{print \$1}' | grep -w $cmpuser |wc -l`
 		if [ "$user" -eq 1 ]; then
 			local jars=`ssh -n $i ps -u $cmpuser | grep -v PID | wc -l`
 			if [ "$jars" -gt 0 ]; then
-				ssh $i <<EOF
+				ssh -Tq $i <<EOF
 				killall -9 -u $cmpuser
 				exit
 EOF
@@ -676,22 +685,129 @@ EOF
 			echo_yellow "尚未创建$cmpuser用户,请手动关闭服务!"
 		#	exit
 		fi
+		
 	done
-	echo_green "所有节点IM关闭完成..."
+
+	#关redis
+	for i in "${REDIS_HOST[@]}"
+        do
+		echo "关闭节点redis"$i
+        	local rediss=`ssh -n $i lsof -n | grep redis | wc -l`
+		if [ "$rediss" -gt 0 ]; then
+                	ssh -Tq $i <<EOF
+				pkill redis
+EOF
+		fi
+	done
+
+        #关mongo 
+	if [ "$MONGO_H" != "" ]; then
+        	for i in "${MONGO_HOST[@]}"
+        	do      
+                	echo "关闭节点mongo"$i
+                	local mongos=`ssh -n $i lsof -n | grep mongo | wc -l`
+                	if [ "$mongos" -gt 0 ]; then
+                        	ssh -Tq $i <<EOF
+                                	pkill mongo
+EOF
+               	 	fi
+        	done
+	fi
+	
+	#关keepalived(mysql不动)
+	 for i in $(cat haiplist)
+        do
+        #需在满足条件下才能安装
+        local nplan=`ssh -n $i echo \\$nodeplan`
+        local ntype=`ssh -n $i echo \\$nodetype`
+        local nno=`ssh -n $i echo \\$nodeno`
+        if [ "$nplan" = "1" ] || [ "$ntype" = "1" -a "$nplan" = "2" -a "$nno" = "2" ] || [ "$ntype" = "1" -a "$nplan" = "3" -a "$nno" = "2" ] || [ "$ntype" = "1" -a "$
+nplan" = "4" -a "$nno" = "3" ] || [ "$ntype" = "3" -a "$nplan" = "2" -a "$nno" = "2" ] || [ "$ntype" = "3" -a "$nplan" = "3" -a "$nno" = "2" ] || [ "$ntype" = "3" -a "
+$nplan" = "4" -a "$nno" = "3" ]; then
+        local keepalived=`ssh -n "$i" lsof -n |grep keepalived |wc -l`
+        if [ "$keepalived" -gt 0 ]; then
+		echo "关闭节点keepalived "$i
+                ssh -n $i pkill keepalived
+	fi
+	fi
+	done
+
+	echo_green "所有节点关闭完成..."
 }
 
 #清空安装
 uninstall_internode(){
-	echo_green "清空安装开始..."
+	echo_green "清空安装开始(im平台,redis,mongo,iptables,keepalived)..."
+
 	for i in $(cat haiplist)
 	do
-		echo "删除节点"$i
-		ssh $i <<EOF
+		echo "删除节点IM包"$i
+		ssh -Tq $i <<EOF
 		rm -rf "$CURRENT_DIR"
 		rm -rf /home/$cmpuser/
 		rm -rf /usr/java/
 		rm -rf /tmp/*
-		userdel $cmpuser
+		exit
+EOF
+		echo "删除节点keepalived"$i
+                local keepaliveds=`ssh -n $i rpm -qa | grep keepalived`
+                if [ "$keepaliveds" != "" ]; then
+                                ssh -Tq $i <<EOF
+                                rpm -e $keepaliveds
+                                exit
+EOF
+                fi
+	done
+
+
+	
+	for i in "${REDIS_HOST[@]}"
+        do
+                echo "删除节点redis包"$i
+                ssh -Tq $i <<EOF
+                rm -rf "$REDIS_DIR"
+                exit
+EOF
+        done
+	
+	if [ "$MONGO_H" != "" ]; then 
+        for i in "${MONGO_HOST[@]}"
+        do
+                echo "删除节点mongo包"$i
+                ssh -Tq $i <<EOF
+                rm -rf "$MONGDO_DIR"
+		rm -rf /home/mongo
+                exit
+EOF
+        done
+	fi
+
+        for i in $(cat haiplist)
+        do               
+		echo "删除节点im用户"$i
+		local imuser=`ssh -n $i cat /etc/passwd | sed -n /$cmpuser/p |wc -l`
+                if [ "$imuser" -eq 1 ]; then
+			ssh -n $i userdel -f $cmpuser
+		fi
+	done
+	
+	if [ "$MONGO_H" != "" ]; then
+        for i in "${MONGO_HOST[@]}"
+        do
+                echo "删除节点mongo用户"$i
+                local mongouser=`ssh -n $i cat /etc/passwd | sed -n /mongo/p |wc -l`
+                if [ "$mongouser" -eq 1 ]; then
+                        ssh -n $i userdel -f mongo
+                fi
+        done
+	fi
+
+        for i in $(cat haiplist)
+        do
+                echo "删除节点cmpiptables"$i
+		local iptables=`ssh -n $i iptables -L INPUT | sed -n /cmp/p |wc -l`
+		if [ "$iptables" -gt 0 ]; then
+		ssh -Tq $i <<EOF
 		iptables -P INPUT ACCEPT
 		iptables -D INPUT -j cmp
 		iptables -F cmp
@@ -700,8 +816,49 @@ uninstall_internode(){
 		iptables-save > /etc/sysconfig/iptables
 		exit
 EOF
+		fi
 		echo "complete..."
 	done
+
+        for i in "${REDIS_HOST[@]}"
+        do
+                echo "删除节点redis's iptables"$i
+                local iptables=`ssh -n $i iptables -L INPUT | sed -n /redis/p |wc -l`
+                if [ "$iptables" -gt 0 ]; then
+                ssh -Tq $i <<EOF
+                iptables -P INPUT ACCEPT
+                iptables -D INPUT -j redisdb
+                iptables -F redisdb
+                iptables -X redisdb
+                iptables-save > /etc/iptables
+                iptables-save > /etc/sysconfig/iptables
+                exit
+EOF
+                fi
+
+		echo "complete..."
+	done
+	
+	if [ "$MONGO_H" != "" ]; then
+       		for i in "${MONGO_HOST[@]}"
+        		do
+                	echo "删除节点mongodb's iptables"$i
+                	local iptables=`ssh -n $i iptables -L INPUT | sed -n /mongodb/p |wc -l`
+                	if [ "$iptables" -gt 0 ]; then
+                	ssh -Tq $i <<EOF
+                	iptables -P INPUT ACCEPT
+                	iptables -D INPUT -j mongodb
+                	iptables -F mongodb
+                	iptables -X mongodb
+                	iptables-save > /etc/iptables
+                	iptables-save > /etc/sysconfig/iptables
+                	exit
+EOF
+                	fi
+                	echo "complete..."
+        	done
+	fi
+
 	echo_green "清空安装完成..."
 }
 
@@ -715,7 +872,7 @@ mongo_install(){
                 echo "安装节点..."$i
 		ssh -n "$i" mkdir -p "$MONGDO_DIR"
 		scp -r ../packages/mongo/* "$i":"$MONGDO_DIR"
-		ssh  $i <<EOF
+		ssh -Tq $i <<EOF
 		echo "创建mongo用户"
 		groupadd mongo
 		useradd -r -m -g  mongo mongo
@@ -753,7 +910,7 @@ EOF
 	fi
 	let k=k+1
 	echo "设置需验证登录"
-	ssh $i <<EOF
+	ssh -Tq $i <<EOF
 		echo "配置开机启动"
 		sed -i /mongo/d /etc/rc.d/rc.local
         	echo "su - mongo -c '$MONGDO_DIR/bin/mongod --config $MONGDO_DIR/mongodb.conf'" >> /etc/rc.d/rc.local
@@ -772,27 +929,27 @@ EOF
 }
 
 
-echo_yellow "-----------一键安装说明-------------------"
-echo_yellow "1、可安装mysql5.7;"
-echo_yellow "2、可安装mongodb3;"
-echo_yellow "3、可安装redisHA;"
-echo_yellow "4、可安装keepalived;"
-echo_yellow "5、可安装IM;"
-echo_yellow "6、可清空部署环境。"
+#echo_yellow "-----------一键安装说明-------------------"
+#echo_yellow "1、可安装mysql5.7;"
+#echo_yellow "2、可安装mongodb3;"
+#echo_yellow "3、可安装redisHA;"
+#echo_yellow "4、可安装keepalived;"
+#echo_yellow "5、可安装IM;"
+#echo_yellow "6、可清空部署环境。"
 
-echo_yellow "-------------------------------------------"
-echo_green "HA版方案，请输入编号："
-sleep 3
-clear
+#echo_yellow "-------------------------------------------"
+#echo_green "HA版方案，请输入编号："
+#sleep 3
+#clear
 echo "1-----4台服务器,每台16G内存.3台控制节点，1台采集节点(无mongodb安装)"
 echo "2-----4台服务器,每台16G内存.3台控制节点，1台采集节点(有mongodb安装)" 
-echo "3-----清空部署(mysql,redis,mongo不受影响，但升级环境禁止使用)"
+echo "100-----清空部署(mysql不受影响，但升级环境禁止使用)"
 
 while read item
 do
   case $item in
     [1])
-        nodeplanr=3
+        nodeplanr=2
 		ssh-interconnect
 		user-internode
 		install-interpackage
@@ -807,7 +964,7 @@ do
         break
         ;;
     [2])
-        nodeplanr=3
+        nodeplanr=2
 		ssh-interconnect
 		user-internode
 		install-interpackage
@@ -822,7 +979,7 @@ do
 		keeplived_settings
         break
         ;;
-     [5])
+     100)
 		ssh-interconnect
 		stop_internode
 		uninstall_internode

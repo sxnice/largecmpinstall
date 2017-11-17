@@ -22,13 +22,14 @@ ssh  $i <<EOF
                 iptables -A redisdb -m state --state ESTABLISHED,RELATED -j ACCEPT
                 iptables -A redisdb -p icmp --icmp-type any -j ACCEPT
                 iptables -A INPUT -j redisdb
-                iptables -P INPUT DROP
                 exit
 EOF
 
 
 if [ "$ostype" == "Ubuntu" ]; then
         ssh  $i <<EOF
+		iptables -A INPUT -m state --state ESTABLISHED,RELATED -j ACCEPT
+		iptables -P INPUT DROP
                 iptables-save > /etc/iptables
                 sed -i /iptables/d /etc/rc.local
                 sed -i /exit/d /etc/rc.local
@@ -38,6 +39,8 @@ if [ "$ostype" == "Ubuntu" ]; then
 EOF
 else
         ssh  $i <<EOF
+		iptables -A INPUT -m state --state ESTABLISHED,RELATED -j ACCEPT
+		iptables -P INPUT DROP
                 iptables-save > /etc/sysconfig/iptables
                 sed -i /iptables/d /etc/rc.d/rc.local
                 sed -i /reject-with/d /etc/sysconfig/iptables
