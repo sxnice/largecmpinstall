@@ -18,7 +18,6 @@ ssh  $i <<EOF
                 iptables -A INPUT -p tcp --dport 22 -j ACCEPT
                 iptables -A redisdb -p tcp --dport 7000 -j ACCEPT
                 iptables -A redisdb -p tcp --dport 7001 -j ACCEPT
-                iptables -A redisdb -p tcp --dport 7002 -j ACCEPT
                 iptables -A redisdb -m state --state ESTABLISHED,RELATED -j ACCEPT
                 iptables -A redisdb -p icmp --icmp-type any -j ACCEPT
                 iptables -A INPUT -j redisdb

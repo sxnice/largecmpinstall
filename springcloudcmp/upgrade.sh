@@ -137,7 +137,10 @@ EOF
 		fi
 		
                 echo "安装jdk1.8到节点"$i
-                ssh -n "$i" mkdir -p "$JDK_DIR"
+                ssh -Tq "$i" <<EOF
+		rm -rf "$JDK_DIR"
+		mkdir -p "$JDK_DIR"
+EOF
 
                 scp -r ../packages/jdk/* "$i":"$JDK_DIR"
                 scp ../packages/jce/* "$i":"$JDK_DIR"/jre/lib/security/
@@ -416,13 +419,13 @@ echo_yellow "-------------------------------------------"
 echo_green "HA方案，请输入编号：" 
 sleep 3
 clear
-echo "1-----3台服务器,每台16G内存.2台控制节点，1台采集节点"  
+echo "1-----4台服务器,每台16G内存.3台控制节点，1台采集节点"  
 
 while read item
 do
   case $item in
     [1])
-        nodeplanr=2
+        nodeplanr=3
 		ssh-interconnect
 		user-internode
 		install-interpackage
