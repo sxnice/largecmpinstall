@@ -332,7 +332,8 @@ EOF
                                 exit
 EOF
 		fi
-
+		
+		echo "删除mysql文件"
 		ssh -n $i rm -rf "$MYSQL_DIR"
 		
 		echo "删除mysql节点iptables"$i

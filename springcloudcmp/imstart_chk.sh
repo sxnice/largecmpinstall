@@ -21,7 +21,6 @@ portimapigateway=28082
 portimprovider=28084
 portim3rdinf=28086
 portimweb=8443
-portuniviewmanager=20895
 sleeptime=2
 
 while [ -h "$PRG" ]; do
@@ -210,15 +209,6 @@ while [ "$pIgmcc" = "" ]
 done
 echo "gmcc-manager success!"
 
-echo "check uniview-manager"
-while [ "$pIuniview" = "" ]
-  do
-  sleep $sleeptime
-  pIuniview=`lsof -i :$portuniviewmanager|grep  "LISTEN" | awk '{print $2}'`
-  echo $pIuniview &>/dev/null &
-  echo -n "."
-done
-echo "uniview-manager success!"
 #启动检测-----------------------------end---------------------------------------
 fi
 

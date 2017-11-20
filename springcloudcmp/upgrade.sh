@@ -138,8 +138,11 @@ EOF
 		
                 echo "安装jdk1.8到节点"$i
                 ssh -Tq "$i" <<EOF
+		sed -i /'umask 077'/d ~/.bashrc
+		source ~/.bashrc
 		rm -rf "$JDK_DIR"
 		mkdir -p "$JDK_DIR"
+		chmod 755 "$JDK_DIR"
 EOF
 
                 scp -r ../packages/jdk/* "$i":"$JDK_DIR"
@@ -410,15 +413,15 @@ EOF
 done
 echo_green "启动keepalived完成..."
 }
-echo_yellow "--------一键安装（HA增量）说明-------------"
-echo_yellow "1、仅支持从原HA版本升级！"
-echo_yellow "2、仅支持相同节点数的升级！"
-echo_yellow "3、仅只对IM更新文件进行升级！"
-echo_yellow "4、非HA版的升级，请直接重新安装部署！"
-echo_yellow "-------------------------------------------"
-echo_green "HA方案，请输入编号：" 
-sleep 3
-clear
+#echo_yellow "--------一键安装（HA增量）说明-------------"
+#echo_yellow "1、仅支持从原HA版本升级！"
+#echo_yellow "2、仅支持相同节点数的升级！"
+#echo_yellow "3、仅只对IM更新文件进行升级！"
+#echo_yellow "4、非HA版的升级，请直接重新安装部署！"
+#echo_yellow "-------------------------------------------"
+#echo_green "HA方案，请输入编号：" 
+#sleep 3
+#clear
 echo "1-----4台服务器,每台16G内存.3台控制节点，1台采集节点"  
 
 while read item

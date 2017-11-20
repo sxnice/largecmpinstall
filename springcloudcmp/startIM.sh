@@ -20,7 +20,6 @@ portimapigateway=28082
 portimprovider=28084
 portim3rdinf=28086
 portimweb=8443
-portuniviewmanager=20895
 sleeptime=5
 
 while [ -h "$PRG" ]; do
@@ -351,15 +350,6 @@ if [ "$pIgmcc" = "" ] ; then
 nohup "$CURRENT_DIR"/background/springbootstartgmccmanager.sh &>/dev/null &
 fi
 
-#启动统一视图
-echo "start uniview-manager"
-#检测univiewmanager是否启动完成
-pIuniview=`lsof -i :$portuniviewmanager|grep  "LISTEN" | awk '{print $2}'`
-echo $pIuniview
-if [ "$pIuniview" = "" ] ; then
-nohup "$CURRENT_DIR"/background/springbootstartuniviewmanager.sh &>/dev/null &
-fi
-
 #启动检测-----------------------------start-------------------------------------
 while [ "$pIimweb" = "" ]
   do
@@ -388,14 +378,6 @@ while [ "$pIgmcc" = "" ]
 done
 echo "gmcc-manager success!"
 
-while [ "$pIuniview" = "" ]
-  do
-  sleep $sleeptime
-  pIuniview=`lsof -i :$portuniviewmanager|grep  "LISTEN" | awk '{print $2}'`
-  echo $pIuniview &>/dev/null &
-  echo -n "."
-done
-echo "uniview-manager success!"
 #启动检测-----------------------------end---------------------------------------
 fi
 

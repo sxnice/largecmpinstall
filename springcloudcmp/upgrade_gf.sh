@@ -178,8 +178,11 @@ EOF
 	do
                 echo "安装jdk1.8到节点"$i
                 ssh -Tq "$i" <<EOF
+		sed -i /'umask 077'/d ~/.bashrc
+                source ~/.bashrc
 		rm -rf "$JDK_DIR"
 		mkdir -p "$JDK_DIR"
+		chmod 755 "$JDK_DIR"
 EOF
                 scp -r ../packages/jdk/* "$i":"$JDK_DIR"
                 scp ../packages/jce/* "$i":"$JDK_DIR"/jre/lib/security/
@@ -455,16 +458,16 @@ EOF
 
 
 
-echo_yellow "-----------一键安装（增量）说明-------------------"
-echo_yellow "1、可安装JDK软件;"
-echo_yellow "2、可安装有iptables lsof软件;"
-echo_yellow "3、初始化时，建议使用root用户安装;"
-echo_yellow "4、确保.sh有执行权限，并且使用 ./xxx.sh执行;"
-echo_yellow "5、可配置数据库连接,并更新jce;"
-echo_yellow "-------------------------------------------"
-echo_green "HA方案，请输入编号：" 
-sleep 3
-clear
+#echo_yellow "-----------一键安装（增量）说明-------------------"
+#echo_yellow "1、可安装JDK软件;"
+#echo_yellow "2、可安装有iptables lsof软件;"
+#echo_yellow "3、初始化时，建议使用root用户安装;"
+#echo_yellow "4、确保.sh有执行权限，并且使用 ./xxx.sh执行;"
+#echo_yellow "5、可配置数据库连接,并更新jce;"
+#echo_yellow "-------------------------------------------"
+#echo_green "HA方案，请输入编号：" 
+#sleep 3
+#clear
 echo "1-----4台服务器(每台16G内存.3台控制节点，1台采集节点) + 扩容采集节点N台"  
 
 while read item
