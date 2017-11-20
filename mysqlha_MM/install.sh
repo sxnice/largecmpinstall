@@ -332,9 +332,10 @@ EOF
                                 exit
 EOF
 		fi
-
-		ssh -n $i rm -rf "$MYSQL_DIR"
 		
+		echo "删除mysql文件"
+		ssh -n $i rm -rf "$MYSQL_DIR"
+
 		echo "删除mysql节点iptables"$i
                 local iptables=`ssh -n $i iptables -L INPUT | sed -n /mysqldb/p |wc -l`
                 if [ "$iptables" -gt 0 ]; then
