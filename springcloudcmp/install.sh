@@ -12,6 +12,7 @@ eurekaiprepr=localhost
 hanoder="main"
 JDK_DIR="/usr/java"
 MONGDO_DIR="/usr/local/mongodb"
+MONGDO_ARBITER_DIR="/usr/local/mongodb_arbiter"
 REDIS_DIR="/usr/local/redis"
 KEEPALIVED_DIR="/usr/local/keepalived"
 
@@ -22,11 +23,13 @@ CURRENT_DIR="/springcloudcmp"
 cmpuser="cmpimuser"
 cmppass="Pbu4@123"
 #REDISIP 主IP，从IP，仲裁IP 空格格开(仅支持配置三个节点IP)
-REDIS_H="10.143.132.187 10.143.132.190 10.143.132.196"
+REDIS_H=""
 #MONGOIP 主IP,从IP，仲裁IP 空格格开(仅支持配置三个节点IP)
-MONGO_H="10.143.132.187 10.143.132.190 10.143.132.196"
+MONGO_H="10.143.132.189 10.143.132.192 10.143.132.196"
 MONGO_USER="evuser"
 MONGO_PASSWORD="Pbu4@123"
+#MONGO_ARBITER_NODES最多2个，可设置(0,1,2)
+MONGO_ARBITER_NODES=0
 #haiplist文件存放HA节点ip组
 #IM浮动IP
 VIP="10.143.132.168"
@@ -229,10 +232,12 @@ EOF
 	done
 	
 	echo "配置hosts"
+	local j=1
 	for i in $(cat haiplist)
 	do
-		local hname=`ssh -n $i hostname`
+		local hname="im_"$j"node"
 		echo $i" "$hname >> .hosts
+		let j=j+1
 	done
 	for i in $(cat haiplist)
 	do
@@ -714,7 +719,7 @@ EOF
                 	local mongos=`ssh -n $i lsof -n | grep mongo | wc -l`
                 	if [ "$mongos" -gt 0 ]; then
                         	ssh -Tq $i <<EOF
-                                	pkill mongo
+                                	killall -9 -u mongo
 EOF
                	 	fi
         	done
@@ -784,6 +789,8 @@ EOF
                 echo "删除节点mongo包"$i
                 ssh -Tq $i <<EOF
                 rm -rf "$MONGDO_DIR"
+		rm -rf "$MONGDO_ARBITER_DIR"1
+		rm -rf "$MONGDO_ARBITER_DIR"2
 		rm -rf /home/mongo
                 exit
 EOF
@@ -897,7 +904,7 @@ mongo_install(){
 		mkdir -p data/logs
 		mkdir -p data/db
 		echo "start mongodb"
-		nohup ./bin/mongod --port=31001 --dbpath=$MONGDO_DIR/data/db --logpath=$MONGDO_DIR/data/logs/mongodb.log --replSet dbReplSet  &>/dev/null &
+		nohup ./bin/mongod --port=31001 --dbpath=$MONGDO_DIR/data/db --logpath=$MONGDO_DIR/data/logs/mongodb.log --replSet dbReplSet --oplogSize 10000  &>/dev/null &
 		echo "配置环境变量"
 		sed -i /mongo/d ~/.bashrc
 		echo export PATH=$MONGDO_DIR/bin:'\$PATH' >> ~/.bashrc
@@ -906,32 +913,94 @@ mongo_install(){
 EOF
 	echo "complete..."
 	done
+
+	local j=1
+        for i in "${MONGO_HOST[@]}"
+        do
+                if [ "$j" -lt 3 ]; then
+		local v=1
+                while [ $v -le $MONGO_ARBITER_NODES ]
+		do
+                echo "安装仲裁节点..."$i
+                ssh -n "$i" mkdir -p "$MONGDO_ARBITER_DIR""$v"
+                scp -r ../packages/mongo/* "$i":"$MONGDO_ARBITER_DIR""$v"
+		local port=31001
+		let port=$port+$v
+                ssh -Tq $i <<EOF
+                echo "修改文件权限"
+                chown -R mongo.mongo "$MONGDO_ARBITER_DIR""$v"
+                chmod 700 "$MONGDO_ARBITER_DIR""$v"/bin/*
+                chmod 600 "$MONGDO_ARBITER_DIR""$v"/mongo.key
+                su - mongo
+                cd "$MONGDO_ARBITER_DIR""$v"
+                umask 077
+                mkdir -p data/logs
+                mkdir -p data/db
+                sed -i '/31001/{s/31001/$port/}' "$MONGDO_ARBITER_DIR""$v"/mongodb.conf
+                sed -i '/mongodb/{s/mongodb/mongodb_arbiter$v/}' "$MONGDO_ARBITER_DIR""$v"/mongodb.conf
+                echo "start mongodb_arbiter"
+                nohup ./bin/mongod --port=$port --dbpath="$MONGDO_ARBITER_DIR""$v"/data/db --logpath="$MONGDO_ARBITER_DIR""$v"/data/logs/mongodb.log --replSet dbReplSet &>/dev/null &
+                exit
+EOF
+	echo "complete..."
+	v=$(($v+1))
+	done
+        fi
+        let j=j+1
+        done
+
 	sleep 20
 	echo "配置monogo"
 	for i in "${MONGO_HOST[@]}"
 	do
 		if [ "$k" -eq 1 ]; then
-		scp ./init_mongo.sh "$i":/root/
 		#设置mongdodb密码	
 		declare -a MONGOS=($MONGO_H $MONGO_USER $MONGO_PASSWORD) 
+		if [ $MONGO_ARBITER_NODES -eq 0 ]; then
+		scp ./init_mongo.sh "$i":/root/
 		ssh -n $i /root/init_mongo.sh "${MONGOS[@]}"
+		elif [ $MONGO_ARBITER_NODES -eq 1 ]; then
+		scp ./init_mongo1.sh "$i":/root/
+		ssh -n $i /root/init_mongo1.sh "${MONGOS[@]}"
+		elif [ $MONGO_ARBITER_NODES -eq 2 ]; then
+		scp ./init_mongo2.sh "$i":/root/
+		ssh -n $i /root/init_mongo2.sh "${MONGOS[@]}"
+		fi
 	fi
-	let k=k+1
 	echo "设置需验证登录"
 	ssh -Tq $i <<EOF
 		echo "配置开机启动"
 		sed -i /mongo/d /etc/rc.d/rc.local
         	echo "su - mongo -c '$MONGDO_DIR/bin/mongod --config $MONGDO_DIR/mongodb.conf'" >> /etc/rc.d/rc.local
+		if [ "$k" -lt 3 ]; then
+			
+			if [ $MONGO_ARBITER_NODES -gt 0 ]; then
+                		echo "su - mongo -c '"$MONGDO_ARBITER_DIR"1/bin/mongod --config "$MONGDO_ARBITER_DIR"1/mongodb.conf'" >> /etc/rc.d/rc.local
+			fi
+                	if [ $MONGO_ARBITER_NODES -gt 1 ]; then
+				echo "su - mongo -c '"$MONGDO_ARBITER_DIR"2/bin/mongod --config "$MONGDO_ARBITER_DIR"2/mongodb.conf'" >> /etc/rc.d/rc.local
+			fi
+		fi
         	chmod u+x /etc/rc.d/rc.local
 		
-		pkill mongod
-		sleep 10
+		killall -9 -u mongo
+		sleep 20
 		su - mongo
 		cd $MONGDO_DIR
 		echo "restart mongodb"
 		nohup ./bin/mongod --config mongodb.conf  &>/dev/null &
+		if [ "$k" -lt 3 ]; then
+			
+                        if [ $MONGO_ARBITER_NODES -gt 0 ]; then
+	                	nohup "$MONGDO_ARBITER_DIR"1/bin/mongod --config "$MONGDO_ARBITER_DIR"1/mongodb.conf  &>/dev/null &
+			fi
+			if [ $MONGO_ARBITER_NODES -gt 1 ]; then
+				nohup "$MONGDO_ARBITER_DIR"2/bin/mongod --config "$MONGDO_ARBITER_DIR"2/mongodb.conf  &>/dev/null &
+			fi
+                fi
 EOF
 	echo "complete..."
+	let k=k+1
 	done
 	echo_green "安装完成"
 }

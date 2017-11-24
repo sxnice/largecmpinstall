@@ -54,6 +54,7 @@ ssh -Tq $i <<EOF
 		iptables -A cmp -s $k -p tcp --dport 28085 -j ACCEPT
 		iptables -A cmp -s $k -p tcp --dport 28086 -j ACCEPT
 		iptables -A cmp -s $k -p tcp --dport 61626 -j ACCEPT
+	#	iptables -A cmp -s $k -p tcp --dport 20895 -j ACCEPT
 		exit
 
 EOF

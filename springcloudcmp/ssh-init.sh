@@ -16,9 +16,9 @@ generate_key
 for i in "$@"
 do
 echo =======$i=======
-ssh-copy-id -i ~/.ssh/id_rsa.pub $i
+ssh-copy-id -i ~/.ssh/id_rsa.pub -o StrictHostKeyChecking=no $i
 if [ $? -eq 1 ]; then
-	echo_red "你已多次输错密码，脚本将终止执行！"
+	echo_red "目标主机故障或多次输错密码，脚本将终止执行！"
 	exit 1
 fi
 #expect <<-EOF

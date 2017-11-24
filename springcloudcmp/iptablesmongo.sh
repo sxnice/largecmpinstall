@@ -18,6 +18,7 @@ ssh -Tq $i <<EOF
                 iptables --new mongodb
                 iptables -A INPUT -p tcp --dport 22 -j ACCEPT
                 iptables -A mongodb -p tcp --dport 31001 -j ACCEPT
+		iptables -A mongodb -p tcp --dport 31002 -j ACCEPT
                 iptables -A mongodb -m state --state ESTABLISHED,RELATED -j ACCEPT
                 iptables -A mongodb -p icmp --icmp-type any -j ACCEPT
                 iptables -A INPUT -j mongodb
